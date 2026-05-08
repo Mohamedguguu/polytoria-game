@@ -24,9 +24,17 @@ public partial class Highlight : Instance
 	private DepthModeEnum _depthMode = DepthModeEnum.AlwaysOnTop;
 	private int _renderPriority = 1;
 
-	private readonly List<(MeshInstance3D outline, MeshInstance3D fill)> _overlays = [];
+	// src stored so we can detect mesh resource swaps (shape changes etc)
+	private readonly List<(MeshInstance3D src, MeshInstance3D outline, MeshInstance3D fill)> _overlays = [];
 	private ShaderMaterial? _outlineMat;
 	private StandardMaterial3D? _fillMat;
+
+	// used to detect size changes when no real src mesh exists (multimesh parts)
+	private Vector3 _lastFallbackSize = Vector3.Zero;
+	private bool _usingFallback = false;
+
+	// tag put on overlay nodes so CollectMeshes doesnt accidentally collect them
+	private const string OverlayTag = "_hl_overlay";
 
 	public enum DepthModeEnum
 	{
@@ -111,7 +119,7 @@ public partial class Highlight : Instance
 		set
 		{
 			_fillVisible = value;
-			foreach (var (_, fill) in _overlays)
+			foreach (var (_, outline, fill) in _overlays)
 				if (Node.IsInstanceValid(fill)) fill.Visible = value;
 			OnPropertyChanged();
 		}
@@ -124,7 +132,7 @@ public partial class Highlight : Instance
 		set
 		{
 			_outlineVisible = value;
-			foreach (var (outline, _) in _overlays)
+			foreach (var (_, outline, fill) in _overlays)
 				if (Node.IsInstanceValid(outline)) outline.Visible = value;
 			OnPropertyChanged();
 		}
@@ -151,7 +159,32 @@ public partial class Highlight : Instance
 		if (_enabled && _adornee != null)
 			TryApply();
 
+		SetProcess(true);
 		base.Ready();
+	}
+
+	public override void Process(double delta)
+	{
+		base.Process(delta);
+		if (!_enabled || _adornee == null) return;
+
+		// fallback path: part uses multimesh so there's no real mesh node
+		// we just track the bounds size and rebuild if it changed
+		if (_usingFallback)
+		{
+			Vector3 currentSize = _adornee.CalculateBounds().Size;
+			if (!currentSize.IsEqualApprox(_lastFallbackSize))
+				ApplyHighlight();
+			return;
+		}
+
+		// normal path: check if any source mesh swapped its mesh resource (shape change)
+		// its just a reference compare so nearly free
+		foreach (var (src, outline, _) in _overlays)
+		{
+			if (!Node.IsInstanceValid(src)) { ApplyHighlight(); return; }
+			if (src.Mesh != outline.Mesh) { ApplyHighlight(); return; }
+		}
 	}
 
 	public override void PostReparent()
@@ -223,61 +256,92 @@ public partial class Highlight : Instance
 
 		if (sources.Count > 0)
 		{
+			_usingFallback = false;
 			foreach (MeshInstance3D src in sources)
 			{
 				if (src.Mesh == null) continue;
-				Node parent = src.GetParent() ?? root;
-				SpawnOverlay(src.Mesh, parent, src.Position, src.Rotation, src.Scale);
+				SpawnOverlay(src);
 			}
 		}
 		else
 		{
-			// no meshes found so just slap a box around the bounds
+			// no real mesh found (multimesh part) so box around the bounds
+			_usingFallback = true;
 			Aabb b = _adornee!.CalculateBounds();
+			_lastFallbackSize = b.Size;
 			Vector3 sz = b.Size == Vector3.Zero ? Vector3.One : b.Size;
 			BoxMesh box = new() { Size = sz };
 			Vector3 center = root.IsInsideTree() ? root.ToLocal(b.GetCenter()) : Vector3.Zero;
-			SpawnOverlay(box, root, center, Vector3.Zero, Vector3.One);
+			SpawnFallbackOverlay(box, root, center);
 		}
 
 		SyncMaterials();
 	}
 
-	private void SpawnOverlay(Godot.Mesh mesh, Node parent, Vector3 pos, Vector3 rot, Vector3 scale)
+	// overlays are children of src so they follow transforms automatically
+	private void SpawnOverlay(MeshInstance3D src)
 	{
 		MeshInstance3D outline = new()
 		{
-			Mesh = mesh,
+			Mesh = src.Mesh,
 			MaterialOverride = _outlineMat,
-			Position = pos,
-			Rotation = rot,
-			Scale = scale,
 			CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
 			Visible = _outlineVisible,
 		};
-
 		MeshInstance3D fill = new()
 		{
-			Mesh = mesh,
+			Mesh = src.Mesh,
 			MaterialOverride = _fillMat,
-			Position = pos,
-			Rotation = rot,
-			Scale = scale,
 			CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
 			Visible = _fillVisible,
 		};
 
-		parent.AddChild(outline);
-		parent.AddChild(fill);
-		_overlays.Add((outline, fill));
+		// tag them so CollectMeshes wont pick them up on next rebuild
+		outline.SetMeta(OverlayTag, true);
+		fill.SetMeta(OverlayTag, true);
+
+		src.AddChild(outline);
+		src.AddChild(fill);
+		_overlays.Add((src, outline, fill));
+	}
+
+	private void SpawnFallbackOverlay(Godot.Mesh mesh, Node3D root, Vector3 center)
+	{
+		MeshInstance3D fakeSrc = new() { Mesh = mesh, Position = center };
+		fakeSrc.SetMeta(OverlayTag, true);
+
+		MeshInstance3D outline = new()
+		{
+			Mesh = mesh,
+			MaterialOverride = _outlineMat,
+			CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+			Visible = _outlineVisible,
+		};
+		MeshInstance3D fill = new()
+		{
+			Mesh = mesh,
+			MaterialOverride = _fillMat,
+			CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+			Visible = _fillVisible,
+		};
+
+		outline.SetMeta(OverlayTag, true);
+		fill.SetMeta(OverlayTag, true);
+
+		root.AddChild(fakeSrc);
+		fakeSrc.AddChild(outline);
+		fakeSrc.AddChild(fill);
+		_overlays.Add((fakeSrc, outline, fill));
 	}
 
 	private void RemoveHighlight()
 	{
-		foreach (var (o, f) in _overlays)
+		foreach (var (src, outline, fill) in _overlays)
 		{
-			if (Node.IsInstanceValid(o)) o.QueueFree();
-			if (Node.IsInstanceValid(f)) f.QueueFree();
+			if (Node.IsInstanceValid(outline)) outline.QueueFree();
+			if (Node.IsInstanceValid(fill)) fill.QueueFree();
+			// only free fakeSrc nodes we made ourselves not real part meshes
+			if (Node.IsInstanceValid(src) && src.HasMeta(OverlayTag)) src.QueueFree();
 		}
 		_overlays.Clear();
 		_outlineMat = null;
@@ -307,6 +371,7 @@ public partial class Highlight : Instance
 	}
 
 	// iterative so it doesnt blow the stack on deep node trees
+	// skips nodes tagged as overlays so we dont collect our own nodes on rebuild
 	private static List<MeshInstance3D> CollectMeshes(Node root)
 	{
 		List<MeshInstance3D> result = [];
@@ -316,6 +381,7 @@ public partial class Highlight : Instance
 		while (stack.Count > 0)
 		{
 			Node node = stack.Pop();
+			if (node.HasMeta(OverlayTag)) continue; // skip our own overlay nodes
 			if (node is MeshInstance3D m && m.Mesh != null)
 				result.Add(m);
 			foreach (Node child in node.GetChildren(true))
@@ -337,11 +403,11 @@ public partial class Highlight : Instance
 			"\n" +
 			"void vertex() {\n" +
 			"    vec4 clip = PROJECTION_MATRIX * (MODELVIEW_MATRIX * vec4(VERTEX, 1.0));\n" +
-			"    vec3 clip_nrm = mat3(PROJECTION_MATRIX) * (mat3(MODELVIEW_MATRIX) * NORMAL);\n" +
-			"    vec2 nrm2d = clip_nrm.xy;\n" +
-			"    float len = length(nrm2d);\n" +
-			"    if (len > 0.0001) nrm2d /= len;\n" +
-			"    clip.xy += nrm2d / VIEWPORT_SIZE * outline_size * clip.w * 2.0;\n" +
+			// project vertex+normal into clip space and diff to get true screen-space extrusion dir
+			// works correctly at any distance and angle
+			"    vec4 clip_npos = PROJECTION_MATRIX * (MODELVIEW_MATRIX * vec4(VERTEX + NORMAL * 0.01, 1.0));\n" +
+			"    vec2 offset = normalize(clip_npos.xy / clip_npos.w - clip.xy / clip.w);\n" +
+			"    clip.xy += offset / VIEWPORT_SIZE * outline_size * clip.w * 2.0;\n" +
 			"    if (always_on_top > 0.5) clip.z = clip.w * 0.0001;\n" +
 			"    POSITION = clip;\n" +
 			"}\n" +
@@ -352,4 +418,4 @@ public partial class Highlight : Instance
 			"}\n";
 		return s;
 	}
-}
+}a
