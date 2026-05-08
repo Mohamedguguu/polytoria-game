@@ -4,8 +4,7 @@ using Polytoria.Shared;
 using System.Collections.Generic;
 
 namespace Polytoria.Datamodel;
-// if there is any bugs i am sorry i treid my best wehn making this 
-//try impoving it but i did everything
+
 [Instantiable]
 public partial class Highlight : Instance
 {
@@ -24,16 +23,13 @@ public partial class Highlight : Instance
 	private DepthModeEnum _depthMode = DepthModeEnum.AlwaysOnTop;
 	private int _renderPriority = 1;
 
-	// src stored so we can detect mesh resource swaps (shape changes etc)
 	private readonly List<(MeshInstance3D src, MeshInstance3D outline, MeshInstance3D fill)> _overlays = [];
 	private ShaderMaterial? _outlineMat;
 	private StandardMaterial3D? _fillMat;
 
-	// used to detect size changes when no real src mesh exists (multimesh parts)
 	private Vector3 _lastFallbackSize = Vector3.Zero;
 	private bool _usingFallback = false;
 
-	// tag put on overlay nodes so CollectMeshes doesnt accidentally collect them
 	private const string OverlayTag = "_hl_overlay";
 
 	public enum DepthModeEnum
@@ -265,7 +261,6 @@ public partial class Highlight : Instance
 		}
 		else
 		{
-			// no real mesh found (multimesh part) so box around the bounds
 			_usingFallback = true;
 			Aabb b = _adornee!.CalculateBounds();
 			_lastFallbackSize = b.Size;
@@ -340,7 +335,7 @@ public partial class Highlight : Instance
 		{
 			if (Node.IsInstanceValid(outline)) outline.QueueFree();
 			if (Node.IsInstanceValid(fill)) fill.QueueFree();
-			// only free fakeSrc nodes we made ourselves not real part meshes
+			// only free fakeSrc nodes we made ourselves, not real part meshes
 			if (Node.IsInstanceValid(src) && src.HasMeta(OverlayTag)) src.QueueFree();
 		}
 		_overlays.Clear();
@@ -365,13 +360,10 @@ public partial class Highlight : Instance
 			_outlineMat.SetShaderParameter("outline_size", _outlineSize);
 		}
 
-		// transparency is now used directly as alpha so 0.7 = 0.7 opacity (actually visible)
 		if (_fillMat != null)
 			_fillMat.AlbedoColor = new Color(_fillColor.R, _fillColor.G, _fillColor.B, _fillTransparency);
 	}
 
-	// iterative so it doesnt blow the stack on deep node trees
-	// skips nodes tagged as overlays so we dont collect our own nodes on rebuild
 	private static List<MeshInstance3D> CollectMeshes(Node root)
 	{
 		List<MeshInstance3D> result = [];
@@ -381,7 +373,7 @@ public partial class Highlight : Instance
 		while (stack.Count > 0)
 		{
 			Node node = stack.Pop();
-			if (node.HasMeta(OverlayTag)) continue; // skip our own overlay nodes
+			if (node.HasMeta(OverlayTag)) continue; // skip overlay nodes
 			if (node is MeshInstance3D m && m.Mesh != null)
 				result.Add(m);
 			foreach (Node child in node.GetChildren(true))
@@ -403,8 +395,6 @@ public partial class Highlight : Instance
 			"\n" +
 			"void vertex() {\n" +
 			"    vec4 clip = PROJECTION_MATRIX * (MODELVIEW_MATRIX * vec4(VERTEX, 1.0));\n" +
-			// project vertex+normal into clip space and diff to get true screen-space extrusion dir
-			// works correctly at any distance and angle
 			"    vec4 clip_npos = PROJECTION_MATRIX * (MODELVIEW_MATRIX * vec4(VERTEX + NORMAL * 0.01, 1.0));\n" +
 			"    vec2 offset = normalize(clip_npos.xy / clip_npos.w - clip.xy / clip.w);\n" +
 			"    clip.xy += offset / VIEWPORT_SIZE * outline_size * clip.w * 2.0;\n" +
@@ -418,4 +408,4 @@ public partial class Highlight : Instance
 			"}\n";
 		return s;
 	}
-}a
+}
