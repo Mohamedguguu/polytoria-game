@@ -121,6 +121,7 @@ public partial class InsertMenuPopup : PopupPanel
 			"UIGridLayout",
 			"UIScrollView",
 			"UIViewport",
+			"UIDragDetector",
 		},
 		[new() { Title = "Stats", RecommendOn = [typeof(Stats)] }] = new()
 		{
