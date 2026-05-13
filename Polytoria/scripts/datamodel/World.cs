@@ -29,29 +29,27 @@ namespace Polytoria.Datamodel;
 [Static("world")]
 public sealed partial class World : Instance
 {
-	private const double SyncInterval = 5.0;
-	private const double VitalInterval = 3.0;
-	private const int SyncSampleCount = 5;
+	private const double SyncInterval    = 5.0;
+	private const double VitalInterval   = 3.0;
+	private const int    SyncSampleCount = 5;
 
-	private double _vitalTimer = 0;
-
-	private decimal _serverTime = 0;
-
+	private double  _vitalTimer       = 0;
+	private decimal _serverTime       = 0;
 	private decimal _clientTimeOffset = 0;
-	private double _lastSyncRequest = 0;
-	private uint _nextId = 0;
-	private long _vitalAssetMemory = 0;
-
-	private bool _isLegacyWorld = false;
+	private double  _lastSyncRequest  = 0;
+	private uint    _nextId           = 0;
+	private long    _vitalAssetMemory = 0;
+	private bool    _isLegacyWorld    = false;
 
 	private readonly Queue<double> _rttSamples = new();
 	private double _averageRtt = 0;
 
 	private const int ServerHighLoadThreshold = 10;
 	private static World? _current;
-	private int _worldID = 0;
-	private bool _serverUnderLoad = false;
-	private readonly ConcurrentDictionary<string, TaskCompletionSource<NetworkedObject?>> _pendingRequests = [];
+	private int  _worldID          = 0;
+	private bool _serverUnderLoad  = false;
+
+	private readonly ConcurrentDictionary<string, TaskCompletionSource<NetworkedObject?>> _pendingRequests      = [];
 	private readonly ConcurrentDictionary<string, TaskCompletionSource<NetworkedObject?>> _pendingReadyRequests = [];
 
 	internal int WorldSessionID = 0;
@@ -66,7 +64,6 @@ public sealed partial class World : Instance
 
 	public SessionTypeEnum SessionType { get; set; } = SessionTypeEnum.Client;
 
-	// TODO: Server Vitals/world properties doesn't work yet, make it work
 	[ScriptProperty, SyncVar]
 	public bool IsLegacyWorld
 	{
@@ -91,56 +88,59 @@ public sealed partial class World : Instance
 
 	public bool IsLoaded { get; private set; }
 
-	public event Action<Instance>? InstanceEnteredTree;
-	public event Action<Instance>? InstanceExitingTree;
-	public event Action? ClientScriptRunDispatch;
-	internal event Action<APIPlaceInfo>? WorldInfoReady;
+	public event Action<Instance>?     InstanceEnteredTree;
+	public event Action<Instance>?     InstanceExitingTree;
+	public event Action?               ClientScriptRunDispatch;
+	internal event Action<APIPlaceInfo>?    WorldInfoReady;
 	internal event Action<APIPlaceMedia[]>? WorldMediaReady;
 
-	public Environment Environment => FindChild<Environment>("Environment")!;
-	public Players Players => FindChild<Players>("Players")!;
-	public Lighting Lighting => FindChild<Lighting>("Lighting")!;
-	public PlayerDefaults PlayerDefaults => FindChild<PlayerDefaults>("PlayerDefaults")!;
-	public ScriptService ScriptService => FindChild<ScriptService>("ScriptService")!;
-	public Hidden Hidden => FindChild<Hidden>("Hidden")!;
-	public ServerHidden ServerHidden => FindChild<ServerHidden>("ServerHidden")!;
-	public PlayerGUI PlayerGUI => FindChild<PlayerGUI>("PlayerGUI")!;
-	public ChatService Chat => FindChild<ChatService>("Chat")!;
-	public InputService Input => FindChild<InputService>("Input")!;
-	public FilterService Filter => FindChild<FilterService>("Filter")!;
-	public AssetsService Assets => FindChild<AssetsService>("Assets")!;
-	public AchievementsService Achievements => FindChild<AchievementsService>("Achievements")!;
-	public CoreUIService CoreUI => FindChild<CoreUIService>("CoreUI")!;
-	public Stats Stats => FindChild<Stats>("Stats")!;
-	public Teams Teams => FindChild<Teams>("Teams")!;
-	public DatastoreService Datastore => FindChild<DatastoreService>("Datastore")!;
-	public HttpService Http => FindChild<HttpService>("Http")!;
-	public InsertService Insert => FindChild<InsertService>("Insert")!;
-	public PurchasesService Purchases => FindChild<PurchasesService>("Purchases")!;
-	public TweenService Tween => FindChild<TweenService>("Tween")!;
-	public CaptureService Capture => FindChild<CaptureService>("Capture")!;
-	public PresenceService Presence => FindChild<PresenceService>("Presence")!;
-	public PreferencesService Preferences => FindChild<PreferencesService>("Preferences")!;
-	public IOService IO => FindChild<IOService>("IO")!;
-	public WorldsService Worlds => FindChild<WorldsService>("Worlds")!;
-	public SocialService Social => FindChild<SocialService>("Social")!;
+	// ── Service accessors ─────────────────────────────────────────────────────
+
+	public Environment       Environment      => FindChild<Environment>("Environment")!;
+	public Players           Players          => FindChild<Players>("Players")!;
+	public Lighting          Lighting         => FindChild<Lighting>("Lighting")!;
+	public PlayerDefaults    PlayerDefaults   => FindChild<PlayerDefaults>("PlayerDefaults")!;
+	public ScriptService     ScriptService    => FindChild<ScriptService>("ScriptService")!;
+	public Hidden            Hidden           => FindChild<Hidden>("Hidden")!;
+	public ServerHidden      ServerHidden     => FindChild<ServerHidden>("ServerHidden")!;
+	public PlayerGUI         PlayerGUI        => FindChild<PlayerGUI>("PlayerGUI")!;
+	public ChatService       Chat             => FindChild<ChatService>("Chat")!;
+	public InputService      Input            => FindChild<InputService>("Input")!;
+	public FilterService     Filter           => FindChild<FilterService>("Filter")!;
+	public AssetsService     Assets           => FindChild<AssetsService>("Assets")!;
+	public AchievementsService Achievements   => FindChild<AchievementsService>("Achievements")!;
+	public CoreUIService     CoreUI           => FindChild<CoreUIService>("CoreUI")!;
+	public Stats             Stats            => FindChild<Stats>("Stats")!;
+	public Teams             Teams            => FindChild<Teams>("Teams")!;
+	public DatastoreService  Datastore        => FindChild<DatastoreService>("Datastore")!;
+	public HttpService       Http             => FindChild<HttpService>("Http")!;
+	public InsertService     Insert           => FindChild<InsertService>("Insert")!;
+	public PurchasesService  Purchases        => FindChild<PurchasesService>("Purchases")!;
+	public TweenService      Tween            => FindChild<TweenService>("Tween")!;
+	public CaptureService    Capture          => FindChild<CaptureService>("Capture")!;
+	public PresenceService   Presence         => FindChild<PresenceService>("Presence")!;
+	public PreferencesService Preferences     => FindChild<PreferencesService>("Preferences")!;
+	public IOService         IO               => FindChild<IOService>("IO")!;
+	public WorldsService     Worlds           => FindChild<WorldsService>("Worlds")!;
+	public SocialService     Social           => FindChild<SocialService>("Social")!;
+	public WebSocketService  WebSocketService => FindChild<WebSocketService>("WebSocketService")!;
 #if CREATOR
 	public CreatorContextService CreatorContext => FindChild<CreatorContextService>("CreatorContext")!;
 #endif
 	public Temporary TemporaryContainer => FindChild<Temporary>("Temporary")!;
 
-	internal NetworkService Network { get; set; } = null!;
-	internal DatamodelBridge Bridge { get; set; } = null!;
+	// ── Internal ──────────────────────────────────────────────────────────────
 
-	internal World3D World3D { get; set; } = null!;
+	internal NetworkService  Network   { get; set; } = null!;
+	internal DatamodelBridge Bridge    { get; set; } = null!;
+	internal World3D         World3D   { get; set; } = null!;
 #if CREATOR
 	internal WorldContainer? Container { get; set; } = null!;
-
-	internal CreatorSession LinkedSession = null!;
-	internal string? WorldFilePath;
+	internal CreatorSession  LinkedSession = null!;
+	internal string?         WorldFilePath;
 #endif
-	internal Viewport? RootViewport { get; set; }
-	internal ClientEntry? Entry { get; set; }
+	internal Viewport?    RootViewport { get; set; }
+	internal ClientEntry? Entry        { get; set; }
 
 	public static World? Current
 	{
@@ -148,17 +148,16 @@ public sealed partial class World : Instance
 		set
 		{
 			_current = value;
-
 #if CREATOR
 			Menu.Singleton?.SwitchTo(value);
 			Explorer.Singleton?.SwitchTo(value);
 			Properties.Singleton?.SwitchTo(value);
 			FileBrowser.Singleton?.SwitchTo(value?.LinkedSession);
 
-			// Set window title
 			if (value != null && value.LinkedSession != null)
 			{
-				DisplayServer.WindowSetTitle($"{value.LinkedSession.Metadata.ProjectName} - Polytoria Creator v{Globals.AppVersion}");
+				DisplayServer.WindowSetTitle(
+					$"{value.LinkedSession.Metadata.ProjectName} - Polytoria Creator v{Globals.AppVersion}");
 				CreatorService.CurrentSession = value.LinkedSession;
 			}
 #endif
@@ -166,7 +165,7 @@ public sealed partial class World : Instance
 	}
 
 	public readonly ConcurrentDictionary<string, NetworkedObject> NetworkObjects = [];
-	public readonly ConcurrentDictionary<string, NetworkedObject> Objects = [];
+	public readonly ConcurrentDictionary<string, NetworkedObject> Objects        = [];
 
 	[ScriptProperty, ScriptLegacyProperty("GameID")]
 	public int WorldID
@@ -176,17 +175,12 @@ public sealed partial class World : Instance
 		{
 			_worldID = value;
 			if (_worldID != 0)
-			{
 				FetchWorldInfo();
-			}
 		}
 	}
 
-	[ScriptProperty]
-	public int ServerID { get; internal set; }
-
-	[ScriptProperty]
-	public decimal UpTime { get; private set; } = 0;
+	[ScriptProperty] public int     ServerID { get; internal set; }
+	[ScriptProperty] public decimal UpTime   { get; private set; } = 0;
 
 	[ScriptProperty]
 	public decimal ServerTime
@@ -199,9 +193,8 @@ public sealed partial class World : Instance
 			}
 			else
 			{
-				// Client: local time + offset - half RTT to account for network delay
-				decimal localTime = Time.GetTicksMsec() / 1000m;
-				decimal rttCompensation = (decimal)(_averageRtt / 2.0);
+				decimal localTime        = Time.GetTicksMsec() / 1000m;
+				decimal rttCompensation  = (decimal)(_averageRtt / 2.0);
 				return localTime + _clientTimeOffset - rttCompensation;
 			}
 		}
@@ -210,8 +203,7 @@ public sealed partial class World : Instance
 	[ScriptProperty, Attributes.Obsolete("Use Players.PlayersCount instead")]
 	public int PlayersConnected => Players.PlayersCount;
 
-	[ScriptProperty]
-	public int InstanceCount { get; private set; } = 0;
+	[ScriptProperty] public int InstanceCount { get; private set; } = 0;
 
 	[ScriptProperty, Attributes.Obsolete("Use InstanceCount instead")]
 	public int LocalInstanceCount => InstanceCount;
@@ -230,9 +222,11 @@ public sealed partial class World : Instance
 		}
 	}
 
-	internal APIPlaceInfo? WorldInfo { get; private set; }
-	internal APIPlaceMedia[]? WorldMedia { get; private set; }
-	internal int FirstWorldMedia = 0;
+	internal APIPlaceInfo?   WorldInfo       { get; private set; }
+	internal APIPlaceMedia[]? WorldMedia      { get; private set; }
+	internal int              FirstWorldMedia = 0;
+
+	// ── Lifecycle ─────────────────────────────────────────────────────────────
 
 	public override void Init()
 	{
@@ -245,6 +239,9 @@ public sealed partial class World : Instance
 
 	public override void PreDelete()
 	{
+		// Close all WebSocket connections before teardown
+		WebSocketService?.CloseAllAsync().GetAwaiter().GetResult();
+
 		NetworkObjects.Clear();
 		Objects.Clear();
 		_pendingReadyRequests.Clear();
@@ -257,15 +254,12 @@ public sealed partial class World : Instance
 		UpTime += (decimal)delta;
 		Rendered.Invoke(delta);
 
-		// Clock sync
 		if (Network != null)
 		{
 			if (Network.IsServer)
 			{
-				// Server: increment authoritative time
-				_serverTime += (decimal)delta;
-
-				_vitalTimer += delta;
+				_serverTime  += (decimal)delta;
+				_vitalTimer  += delta;
 
 				if (_vitalTimer > VitalInterval)
 				{
@@ -275,7 +269,6 @@ public sealed partial class World : Instance
 			}
 			else if (SessionType == SessionTypeEnum.Client)
 			{
-				// Client: periodically request sync
 				double currentTime = Time.GetTicksMsec() / 1000.0;
 				if (currentTime - _lastSyncRequest >= SyncInterval)
 				{
@@ -284,19 +277,17 @@ public sealed partial class World : Instance
 				}
 			}
 		}
+
 		base.Process(delta);
 	}
 
-	// update server vital signs
 	private void SyncVitals()
 	{
 		VitalAssetMemory = AssetLoader.Singleton.AssetSizeBytes;
-
-		// Check if under load
-		ServerUnderLoad = Engine.GetFramesPerSecond() <= ServerHighLoadThreshold;
+		ServerUnderLoad  = Engine.GetFramesPerSecond() <= ServerHighLoadThreshold;
 	}
 
-	#region Clock Sync
+	// ── Clock sync ────────────────────────────────────────────────────────────
 
 	private void RequestClockSync()
 	{
@@ -314,39 +305,29 @@ public sealed partial class World : Instance
 	private void NetRecvSyncResponse(decimal serverTime, double clientSendTime)
 	{
 		double clientReceiveTime = Time.GetTicksMsec() / 1000.0;
-		double rtt = clientReceiveTime - clientSendTime;
+		double rtt               = clientReceiveTime - clientSendTime;
 
-		// Track RTT samples for averaging
 		_rttSamples.Enqueue(rtt);
 		if (_rttSamples.Count > SyncSampleCount)
-		{
 			_rttSamples.Dequeue();
-		}
 
-		// Calculate average RTT
 		double totalRtt = 0;
 		foreach (double sample in _rttSamples)
-		{
 			totalRtt += sample;
-		}
 		_averageRtt = totalRtt / _rttSamples.Count;
 
-		// Calculate offset, server time was accurate at (clientSendTime + RTT/2)
 		decimal estimatedServerTimeNow = serverTime + (decimal)(rtt / 2.0);
-		decimal currentLocalTime = (decimal)clientReceiveTime;
-
-		// Update offset
-		_clientTimeOffset = estimatedServerTimeNow - currentLocalTime;
+		decimal currentLocalTime       = (decimal)clientReceiveTime;
+		_clientTimeOffset              = estimatedServerTimeNow - currentLocalTime;
 	}
 
-	#endregion
+	// ── Network helpers ───────────────────────────────────────────────────────
 
 	public void ListenToNetworkService()
 	{
-		// Fire ready for client/server
 		if (Network != null)
 		{
-			Network.ClientReady += InvokeReady;
+			Network.ClientReady   += InvokeReady;
 			Network.ServerStarted += InvokeReady;
 		}
 	}
@@ -370,21 +351,11 @@ public sealed partial class World : Instance
 	}
 
 	public NetworkedObject? GetNetObjectFromID(string networkID)
-	{
-		return NetworkObjects.TryGetValue(networkID, out NetworkedObject? netObj) ? netObj : null;
-	}
+		=> NetworkObjects.TryGetValue(networkID, out NetworkedObject? netObj) ? netObj : null;
 
 	public NetworkedObject? GetObjectFromID(string objID)
-	{
-		return Objects.TryGetValue(objID, out NetworkedObject? netObj) ? netObj : null;
-	}
+		=> Objects.TryGetValue(objID, out NetworkedObject? netObj) ? netObj : null;
 
-	/// <summary>
-	/// Wait for net object, this will also ensure that it's ready
-	/// </summary>
-	/// <param name="networkID"></param>
-	/// <param name="timeoutMs"></param>
-	/// <returns></returns>
 	public async Task<NetworkedObject?> WaitForNetObjectAsync(string networkID, int timeoutMs = 5000)
 	{
 		NetworkedObject? obj = await WaitForNetObjectExistAsync(networkID, timeoutMs);
@@ -393,10 +364,7 @@ public sealed partial class World : Instance
 			await WaitForNetObjectReadyAsync(networkID, timeoutMs);
 			return obj;
 		}
-		else
-		{
-			return null;
-		}
+		return null;
 	}
 
 	private Task<NetworkedObject?> WaitForNetObjectExistAsync(string networkID, int timeoutMs = 5000)
@@ -419,7 +387,6 @@ public sealed partial class World : Instance
 
 	private Task<NetworkedObject?> WaitForNetObjectReadyAsync(string networkID, int timeoutMs = 5000)
 	{
-		// Try to get the object first
 		if (!NetworkObjects.TryGetValue(networkID, out NetworkedObject? netObj))
 			return Task.FromResult<NetworkedObject?>(null);
 
@@ -438,7 +405,6 @@ public sealed partial class World : Instance
 
 		return tcs.Task;
 	}
-
 
 	internal void RegisterNewNetworkedObject(NetworkedObject netObj)
 	{
@@ -460,19 +426,13 @@ public sealed partial class World : Instance
 	}
 
 	internal void UnregisterNetworkedObject(NetworkedObject netObj)
-	{
-		NetworkObjects.TryRemove(netObj.NetworkedObjectID, out _);
-	}
+		=> NetworkObjects.TryRemove(netObj.NetworkedObjectID, out _);
 
 	internal void RegisterObject(NetworkedObject netObj)
-	{
-		Objects[netObj.ObjectID] = netObj;
-	}
+		=> Objects[netObj.ObjectID] = netObj;
 
 	internal void UnregisterObject(NetworkedObject netObj)
-	{
-		Objects.TryRemove(netObj.ObjectID, out _);
-	}
+		=> Objects.TryRemove(netObj.ObjectID, out _);
 
 	internal void ReportNetworkedObjectReady(NetworkedObject netObj)
 	{
@@ -498,11 +458,11 @@ public sealed partial class World : Instance
 		WorldInfo = await PolyAPI.GetWorldFromID(WorldID);
 		if (WorldInfo.HasValue)
 		{
-			// Set Window title to game name
-			DisplayServer.WindowSetTitle($"{TitleEllipsis(WorldInfo.Value.Name, 50)} - Polytoria v{Globals.AppVersion}");
-
+			DisplayServer.WindowSetTitle(
+				$"{TitleEllipsis(WorldInfo.Value.Name, 50)} - Polytoria v{Globals.AppVersion}");
 			WorldInfoReady?.Invoke(WorldInfo.Value);
 		}
+
 		WorldMedia = await PolyAPI.GetWorldMedia(WorldID);
 		if (WorldMedia != null && WorldMedia.Length != 0)
 		{
@@ -512,8 +472,7 @@ public sealed partial class World : Instance
 	}
 
 	private static string TitleEllipsis(string text, int maxLength) =>
-	text.Length > maxLength ? string.Concat(text.AsSpan(0, maxLength), "...") : text;
-
+		text.Length > maxLength ? string.Concat(text.AsSpan(0, maxLength), "...") : text;
 
 	internal void DispatchClientScriptRun()
 	{
@@ -521,14 +480,11 @@ public sealed partial class World : Instance
 		ClientScriptRunDispatch?.Invoke();
 	}
 
-	/// <summary>
-	/// Setup full game hierarchy
-	/// </summary>
-	/// <returns></returns>
+	// ── Setup ─────────────────────────────────────────────────────────────────
+
 	public World Setup()
 	{
 		InputService? inputService = FindChild<InputService>("Input");
-
 		if (inputService == null)
 		{
 			inputService = Globals.LoadInstance<InputService>(Root);
@@ -537,7 +493,6 @@ public sealed partial class World : Instance
 		}
 
 		AssetsService? assetsService = FindChild<AssetsService>("Assets");
-
 		if (assetsService == null)
 		{
 			assetsService = Globals.LoadInstance<AssetsService>(Root);
@@ -546,7 +501,6 @@ public sealed partial class World : Instance
 		}
 
 		Temporary? temporary = FindChild<Temporary>("Temporary");
-
 		if (temporary == null)
 		{
 			temporary = Globals.LoadInstance<Temporary>(Root);
@@ -554,9 +508,7 @@ public sealed partial class World : Instance
 			temporary.NetworkParent = this;
 		}
 
-		// Root classes
 		Environment? environment = FindChild<Environment>("Environment");
-
 		if (environment == null)
 		{
 			environment = Globals.LoadInstance<Environment>(Root);
@@ -564,7 +516,6 @@ public sealed partial class World : Instance
 		}
 
 		Lighting? lighting = FindChild<Lighting>("Lighting");
-
 		if (lighting == null)
 		{
 			lighting = Globals.LoadInstance<Lighting>(Root);
@@ -572,7 +523,6 @@ public sealed partial class World : Instance
 		}
 
 		Players? players = FindChild<Players>("Players");
-
 		if (players == null)
 		{
 			players = Globals.LoadInstance<Players>(Root);
@@ -580,7 +530,6 @@ public sealed partial class World : Instance
 		}
 
 		ScriptService? scriptService = FindChild<ScriptService>("ScriptService");
-
 		if (scriptService == null)
 		{
 			scriptService = Globals.LoadInstance<ScriptService>(Root);
@@ -588,7 +537,6 @@ public sealed partial class World : Instance
 		}
 
 		Hidden? hidden = FindChild<Hidden>("Hidden");
-
 		if (hidden == null)
 		{
 			hidden = Globals.LoadInstance<Hidden>(Root);
@@ -596,7 +544,6 @@ public sealed partial class World : Instance
 		}
 
 		ServerHidden? serverHidden = FindChild<ServerHidden>("ServerHidden");
-
 		if (serverHidden == null)
 		{
 			serverHidden = Globals.LoadInstance<ServerHidden>(Root);
@@ -604,7 +551,6 @@ public sealed partial class World : Instance
 		}
 
 		PlayerDefaults? playerDefaults = FindChild<PlayerDefaults>("PlayerDefaults");
-
 		if (playerDefaults == null)
 		{
 			playerDefaults = Globals.LoadInstance<PlayerDefaults>(Root);
@@ -612,7 +558,6 @@ public sealed partial class World : Instance
 		}
 
 		PlayerGUI? playerGUI = FindChild<PlayerGUI>("PlayerGUI");
-
 		if (playerGUI == null)
 		{
 			playerGUI = Globals.LoadInstance<PlayerGUI>(Root);
@@ -620,7 +565,6 @@ public sealed partial class World : Instance
 		}
 
 		ChatService? chatService = FindChild<ChatService>("Chat");
-
 		if (chatService == null)
 		{
 			chatService = Globals.LoadInstance<ChatService>(Root);
@@ -629,7 +573,6 @@ public sealed partial class World : Instance
 		}
 
 		FilterService? filterService = FindChild<FilterService>("Filter");
-
 		if (filterService == null)
 		{
 			filterService = Globals.LoadInstance<FilterService>(Root);
@@ -769,9 +712,15 @@ public sealed partial class World : Instance
 			socialService.NetworkParent = this;
 		}
 
-		// Sub childrens
-		Camera? camera = Environment.FindChild<Camera>("Camera");
+		WebSocketService? webSocketService = FindChild<WebSocketService>("WebSocketService");
+		if (webSocketService == null)
+		{
+			webSocketService = Globals.LoadInstance<WebSocketService>(Root);
+			webSocketService.NameOverride = "WebSocketService";
+			webSocketService.NetworkParent = this;
+		}
 
+		Camera? camera = Environment.FindChild<Camera>("Camera");
 		if (camera == null)
 		{
 			camera = Globals.LoadInstance<Camera>(Root);
@@ -779,7 +728,6 @@ public sealed partial class World : Instance
 		}
 
 		SunLight? sunLight = Lighting.FindChild<SunLight>("SunLight");
-
 		if (sunLight == null)
 		{
 			sunLight = Globals.LoadInstance<SunLight>(Root);
@@ -787,14 +735,12 @@ public sealed partial class World : Instance
 		}
 
 		Inventory? inventory = playerDefaults.FindChild<Inventory>("Inventory");
-
 		if (inventory == null)
 		{
 			inventory = Globals.LoadInstance<Inventory>(Root);
 			inventory.NetworkParent = playerDefaults;
 		}
 
-		// Sort childrens
 		List<Instance> orderedChildren =
 		[
 			environment,
@@ -824,16 +770,17 @@ public sealed partial class World : Instance
 			ioService,
 			worldsService,
 			socialService,
+			webSocketService,
 		];
 
 		var targetPositions = orderedChildren
 			.Select((child, index) => (child, index))
 			.ToDictionary(x => x.child, x => x.index);
+
 		Instance[] childrenToMove = [.. Children.Where(targetPositions.ContainsKey)];
 		Instance[] childrenToKeep = [.. Children.Where(c => !targetPositions.ContainsKey(c))];
 		Instance[] sortedMovedChildren = [.. childrenToMove.OrderBy(c => targetPositions[c])];
 
-		// Rebuild the Children list
 		Children.Clear();
 
 		int keptIndex = 0;
@@ -852,14 +799,12 @@ public sealed partial class World : Instance
 			}
 		}
 
-		// Add any remaining children at the end
 		while (keptIndex < childrenToKeep.Length)
 		{
 			Children.Add(childrenToKeep[keptIndex]);
 			keptIndex++;
 		}
 
-		// Update all indices
 		for (int i = 0; i < Children.Count; i++)
 		{
 			Children[i].Index = i;
@@ -867,9 +812,7 @@ public sealed partial class World : Instance
 			Explorer.Move(Children[i], i);
 #endif
 			if (Children[i].GDNode != null)
-			{
 				GDNode.MoveChild(Children[i].GDNode, i);
-			}
 		}
 
 		environment.MoveChild(camera, 0);
@@ -878,7 +821,6 @@ public sealed partial class World : Instance
 
 		environment.CurrentCamera = (Camera)environment.FindChildByClass("Camera")!;
 
-		// Use freelook in creator
 #if CREATOR
 		if (SessionType == SessionTypeEnum.Creator && CreatorContext?.Freelook != null)
 			environment.CurrentCamera = CreatorContext.Freelook;

@@ -59,7 +59,8 @@ public partial class InsertMenuPopup : PopupPanel
 			"Tool",
 			"Marker3D",
 			"Camera",
-			"Highlight",
+		
+		  
 		},
 		[new() { Title = "Character", RecommendOn = [typeof(CharacterModel)] }] = new()
 		{
@@ -121,7 +122,7 @@ public partial class InsertMenuPopup : PopupPanel
 			"UIGridLayout",
 			"UIScrollView",
 			"UIViewport",
-			"UIDragDetector",
+	
 		},
 		[new() { Title = "Stats", RecommendOn = [typeof(Stats)] }] = new()
 		{
