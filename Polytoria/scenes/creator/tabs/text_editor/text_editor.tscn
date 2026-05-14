@@ -27,7 +27,7 @@ content_margin_right = 8.0
 content_margin_bottom = 8.0
 bg_color = Color(0, 0, 0, 0.49803922)
 
-[node name="TextEditor" type="Control" unique_id=1712163761 node_paths=PackedStringArray("CodeEditor", "_finder", "_diagLabel")]
+[node name="TextEditor" type="Control" unique_id=1712163761 node_paths=PackedStringArray("CodeEditor", "_finder", "_diagLabel", "_statusBar")]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -39,6 +39,7 @@ script = ExtResource("2_07fmf")
 CodeEditor = NodePath("VBoxContainer/CodeEdit")
 _finder = NodePath("Finder")
 _diagLabel = NodePath("VBoxContainer/DiagLabel")
+_statusBar = NodePath("VBoxContainer/StatusLabel")
 
 [node name="VBoxContainer" type="VBoxContainer" parent="." unique_id=1925503485]
 layout_mode = 1
@@ -76,13 +77,17 @@ theme_override_font_sizes/font_size = 14
 theme_override_styles/normal = SubResource("StyleBoxFlat_aql85")
 autowrap_mode = 3
 
+[node name="StatusLabel" type="Label" parent="VBoxContainer" unique_id=501714400]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 1
+theme_override_font_sizes/font_size = 14
+theme_override_styles/normal = SubResource("StyleBoxFlat_aql85")
+text = "hello.luau: (0:0)"
+vertical_alignment = 1
+autowrap_mode = 3
+
 [node name="Finder" parent="." unique_id=495200113 instance=ExtResource("3_ypnaf")]
-layout_mode = 0
-anchors_preset = 0
-anchor_left = 0.0
-anchor_right = 0.0
-offset_left = 0.0
-offset_top = 36.0
-offset_right = 1152.0
-offset_bottom = 36.0
-grow_horizontal = 1
+layout_mode = 1
+offset_left = -102.0
+offset_right = -102.0

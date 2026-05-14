@@ -32,6 +32,7 @@ public sealed partial class Player : NPC
 	internal bool IsMoving = false;
 	internal IPlayerMovement? PlayerMovement;
 	internal Vector3 LastVelocity;
+	internal Vector3 ExternalVelocity;
 
 	private float _respawnTime = 5.0f;
 	private bool _canMove = true;
@@ -459,7 +460,7 @@ public sealed partial class Player : NPC
 			UpdateTransformTick(delta);
 			if (Root.Network.IsServer && !IsSitting)
 			{
-				CharBody3D.Velocity = LastVelocity.Flip();
+				CharBody3D.Velocity = LastVelocity;
 				CharBody3D.MoveAndSlide();
 				LastVelocity = Vector3.Zero;
 				ApplyPushForce();
@@ -935,6 +936,7 @@ public sealed partial class Player : NPC
 		Stamina = Root.PlayerDefaults.Stamina;
 		MaxStamina = Root.PlayerDefaults.MaxStamina;
 		StaminaRegen = Root.PlayerDefaults.StaminaRegen;
+		StaminaBurn = Root.PlayerDefaults.StaminaBurn;
 		JumpPower = Root.PlayerDefaults.JumpPower;
 		RespawnTime = Root.PlayerDefaults.RespawnTime;
 		UseHeadTurning = Root.PlayerDefaults.UseHeadTurning;
@@ -1043,6 +1045,7 @@ public sealed partial class Player : NPC
 		}
 	}
 
+	[ScriptEnum]
 	public enum PlayerMovementModeEnum
 	{
 		Default,

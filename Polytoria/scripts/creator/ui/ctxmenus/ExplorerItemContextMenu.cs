@@ -5,6 +5,7 @@
 using Godot;
 using Polytoria.Attributes;
 using Polytoria.Creator.Managers;
+using Polytoria.Creator.Settings;
 using Polytoria.Datamodel;
 using Polytoria.Datamodel.Creator;
 using Polytoria.Datamodel.Interfaces;
@@ -27,6 +28,11 @@ public partial class ExplorerItemContextMenu : ContextMenu
 			AddIconItem("plus", "Add Child", 1);
 			AddIconItem("script", "Add Script", 2);
 			AddSeparator();
+			if (Target is Dynamic dyn)
+			{
+				AddIconItem("camera", "Go To", 5);
+				AddSeparator();
+			}
 			if (Target.LinkedModel != null)
 			{
 				if (Target.EditableChildren)
@@ -97,6 +103,11 @@ public partial class ExplorerItemContextMenu : ContextMenu
 					CreatorService.Interface.PromptCreateScript(Target);
 					break;
 				}
+			case 5: // Go To
+				{
+					context.Freelook.MoveToSelected();
+					break;
+				}
 			case 20: // Cut
 				{
 					await CreatorService.Clipboard.SetClipboard(targets);
@@ -148,7 +159,7 @@ public partial class ExplorerItemContextMenu : ContextMenu
 					{
 						if (Target.EditableChildren)
 						{
-							if (!await CreatorService.Interface.PromptConfirmation("Closing this model will discard any unsaved changes.", dismissKey: "Popups.CloseModelWarning")) return;
+							if (!await CreatorService.Interface.PromptConfirmation("Closing this model will discard any unsaved changes.", dismissKey: CreatorSettingKeys.Popups.CloseModelWarning)) return;
 						}
 						Target?.EditableChildren = !Target.EditableChildren;
 					}

@@ -5,8 +5,10 @@
 using Godot;
 using Polytoria.Creator.LSP;
 using Polytoria.Creator.LSP.Schemas;
+using Polytoria.Creator.Settings;
 using Polytoria.Datamodel.Creator;
 using Polytoria.Shared;
+using Polytoria.Shared.Settings;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -28,6 +30,7 @@ public partial class TextEditorRoot : Node
 
 	[Export] private TextEditorFind _finder = null!;
 	[Export] private Label _diagLabel = null!;
+	[Export] private Label _statusBar = null!;
 
 	public static Color ColorDanger { get; private set; } = Color.FromString("D77C79", Colors.White);
 	public static Color ColorOrange { get; private set; } = Color.FromString("E6A472", Colors.White);
@@ -57,6 +60,7 @@ public partial class TextEditorRoot : Node
 			await _completion.CloseScriptAsync(Container.TargetFilePathAbsolute);
 			_completion.PublishDiagnostics -= OnPublishDiagnostics;
 		}
+		CreatorSettingsService.Instance.Changed -= OnCreatorSettingChanged;
 		base._ExitTree();
 	}
 
@@ -73,6 +77,9 @@ public partial class TextEditorRoot : Node
 		CodeEditor.ClearUndoHistory();
 		CodeEditor.TextChanged += OnCodeEditTextChanged;
 		InitSyntaxHighlighter();
+
+		CreatorSettingsService.Instance.Changed += OnCreatorSettingChanged;
+		ApplyIndentSettings();
 
 		CodeEditor.CodeCompletionPrefixes = [".", ":", "\n", ",", " ", "("];
 		CodeEditor.CodeCompletionEnabled = true;
@@ -96,6 +103,24 @@ public partial class TextEditorRoot : Node
 		{
 			await _completion.OpenScriptAsync(Container.TargetFilePathAbsolute);
 		}
+
+		UpdateStatusBar();
+	}
+
+	private void OnCreatorSettingChanged(SettingChangedEvent e)
+	{
+		if (e.Key == CreatorSettingKeys.CodeEditor.IndentationMode || e.Key == CreatorSettingKeys.CodeEditor.IndentationSize)
+		{
+			ApplyIndentSettings();
+		}
+	}
+
+	private void ApplyIndentSettings()
+	{
+		IndentationModeEnum indentationMode = CreatorSettingsService.Instance.Get<IndentationModeEnum>(CreatorSettingKeys.CodeEditor.IndentationMode);
+		int indentationSize = CreatorSettingsService.Instance.Get<int>(CreatorSettingKeys.CodeEditor.IndentationSize);
+		CodeEditor.IndentUseSpaces = indentationMode == IndentationModeEnum.Spaces;
+		CodeEditor.IndentSize = indentationSize;
 	}
 
 	private async void OnPublishDiagnostics(string path, List<LspDiagnostic> diagnostics)
@@ -176,11 +201,17 @@ public partial class TextEditorRoot : Node
 		}
 		else if (@event.IsActionPressed("textedit_find") || @event.IsActionPressed("textedit_replace"))
 		{
+			CodeEditor.AcceptEvent();
 			_finder.Open(CodeEditor.GetSelectedText());
 		}
 		else if (@event.IsActionPressed("ui_cancel"))
 		{
+			CodeEditor.AcceptEvent();
 			_finder.Close();
+		}
+		else
+		{
+			UpdateStatusBar();
 		}
 	}
 
@@ -298,6 +329,13 @@ public partial class TextEditorRoot : Node
 			CodeEditor.AddCodeCompletionOption(item.Kind, item.DisplayText, item.InsertText, icon: icon, location: -1);
 		}
 		CodeEditor.UpdateCodeCompletionOptions(false);
+	}
+
+	private void UpdateStatusBar()
+	{
+		int lineIndex = CodeEditor.GetCaretLine() + 1;
+		int column = CodeEditor.GetCaretColumn() + 1;
+		_statusBar.Text = $"{Container.OriginTabName}: ({lineIndex}:{column})";
 	}
 
 	public string GetWordBeforeCaret()

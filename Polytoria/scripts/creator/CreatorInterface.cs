@@ -5,6 +5,7 @@
 using Godot;
 using Polytoria.Attributes;
 using Polytoria.Creator.Managers;
+using Polytoria.Creator.Settings;
 using Polytoria.Creator.UI;
 using Polytoria.Creator.UI.Popups;
 using Polytoria.Creator.UI.Splashes;
@@ -15,6 +16,7 @@ using Polytoria.Enums;
 using Polytoria.Formats;
 using Polytoria.Scripting;
 using Polytoria.Shared;
+using Polytoria.Shared.Settings;
 using Polytoria.Utils;
 using System;
 using System.Collections.Generic;
@@ -110,14 +112,34 @@ public partial class CreatorInterface : Control, IScriptObject
 			StartupSplash.Singleton.Open();
 		}
 
-		CreatorSettings.Singleton.GetSettingProperty("Interface.UIScale")!.ValueChanged += (_) => { ApplyUIScale(); };
-		CreatorSettings.Singleton.GetSettingProperty("Interface.UseFullscreen")!.ValueChanged += (_) => { ApplyFullscreen(); };
-		CreatorSettings.Singleton.GetSettingProperty("Graphics.VSync")!.ValueChanged += (_) => { ApplyVSync(); };
+		CreatorSettingsService.Instance.Changed += OnSettingChanged;
 		ApplyUIScale();
 		ApplyFullscreen();
 		ApplyVSync();
 
 		base._Ready();
+	}
+
+	public override void _ExitTree()
+	{
+		CreatorSettingsService.Instance.Changed -= OnSettingChanged;
+		base._ExitTree();
+	}
+
+	private void OnSettingChanged(SettingChangedEvent e)
+	{
+		switch (e.Key)
+		{
+			case CreatorSettingKeys.Interface.UiScale:
+				ApplyUIScale();
+				break;
+			case SharedSettingKeys.Display.Fullscreen:
+				ApplyFullscreen();
+				break;
+			case SharedSettingKeys.Display.VSync:
+				ApplyVSync();
+				break;
+		}
 	}
 
 	public override void _Process(double delta)
@@ -128,7 +150,7 @@ public partial class CreatorInterface : Control, IScriptObject
 
 	private void ApplyUIScale()
 	{
-		float baseUIScale = CreatorSettings.Singleton.GetSetting<float>("Interface.UIScale");
+		float baseUIScale = CreatorSettingsService.Instance.Get<float>(CreatorSettingKeys.Interface.UiScale);
 
 		// Get the OS display scale factor
 		int screenId = DisplayServer.WindowGetCurrentScreen();
@@ -141,12 +163,18 @@ public partial class CreatorInterface : Control, IScriptObject
 
 	private static void ApplyFullscreen()
 	{
-		DisplayServer.WindowSetMode(CreatorSettings.Singleton.GetSetting<bool>("Interface.UseFullscreen") ? DisplayServer.WindowMode.Fullscreen : DisplayServer.WindowMode.Maximized);
+		if (Globals.IsInGDEditor)
+		{
+			DisplayServer.WindowSetMode(DisplayServer.WindowMode.Windowed);
+			return;
+		}
+
+		DisplayServer.WindowSetMode(CreatorSettingsService.Instance.Get<bool>(SharedSettingKeys.Display.Fullscreen) ? DisplayServer.WindowMode.Fullscreen : DisplayServer.WindowMode.Maximized);
 	}
 
 	private static void ApplyVSync()
 	{
-		bool useVSync = CreatorSettings.Singleton.GetSetting<bool>("Graphics.VSync");
+		bool useVSync = CreatorSettingsService.Instance.Get<bool>(SharedSettingKeys.Display.VSync);
 		DisplayServer.WindowSetVsyncMode(useVSync ? DisplayServer.VSyncMode.Enabled : DisplayServer.VSyncMode.Disabled);
 		OS.LowProcessorUsageMode = useVSync;
 	}
@@ -430,7 +458,7 @@ public partial class CreatorInterface : Control, IScriptObject
 	{
 		if (dismissKey != null)
 		{
-			bool isShown = CreatorSettings.Singleton.GetSetting<bool>(dismissKey);
+			bool isShown = CreatorSettingsService.Instance.Get<bool>(dismissKey);
 			if (!isShown) return true;
 		}
 
@@ -454,7 +482,7 @@ public partial class CreatorInterface : Control, IScriptObject
 			tcs.SetResult(true);
 			if (dismissKey != null)
 			{
-				CreatorSettings.Singleton.SetSetting(dismissKey, false);
+				CreatorSettingsService.Instance.Set(dismissKey, false);
 			}
 			dialog.QueueFree();
 		};
@@ -591,33 +619,56 @@ public partial class CreatorInterface : Control, IScriptObject
 		return InsertMenu;
 	}
 
-	public void PromptFileSelect(FileSelectPromptPayload data, Action<string[]> callback)
+	public void PromptFileSelect(FileSelectPromptPayload data, Action<string[]> callback, Action? onCancel = null)
 	{
-		bool replaceCur = false;
-		if (data.CurrentDirectory == "")
+		bool replaceCur = string.IsNullOrEmpty(data.CurrentDirectory);
+		string currentDir = replaceCur ? LastFilePromptFolder : data.CurrentDirectory;
+
+		FileDialog dialog = new()
 		{
-			replaceCur = true;
-			data.CurrentDirectory = LastFilePromptFolder;
+			Title = data.Title,
+			CurrentDir = currentDir,
+			CurrentFile = data.FileName,
+			ShowHiddenFiles = data.ShowHidden,
+			FileMode = MapFileMode(data.DialogMode),
+			Access = FileDialog.AccessEnum.Filesystem,
+			UseNativeDialog = true,
+		};
+
+		if (data.Filters is { Length: > 0 })
+			dialog.Filters = data.Filters;
+
+		AddChild(dialog);
+
+		void OnPathsSelected(string[] paths)
+		{
+			if (replaceCur)
+				LastFilePromptFolder = paths[0].GetBaseDir();
+			callback.Invoke(paths);
+			dialog.QueueFree();
 		}
-		DisplayServer.FileDialogShow(
-			data.Title,
-			data.CurrentDirectory,
-			data.FileName,
-			data.ShowHidden,
-			data.DialogMode,
-			data.Filters,
-			Callable.From<bool, string[], int>((status, paths, index) =>
-			{
-				if (!status) return;
-				if (replaceCur) LastFilePromptFolder = paths[0].GetBaseDir();
-				callback.Invoke(paths);
-			})
-		);
+
+		dialog.FileSelected += path => OnPathsSelected([path]);
+		dialog.DirSelected += path => OnPathsSelected([path]);
+		dialog.FilesSelected += paths => OnPathsSelected(paths);
+		dialog.Canceled += () => { onCancel?.Invoke(); dialog.QueueFree(); };
+
+		dialog.PopupCentered(new Vector2I(800, 600));
 	}
+
+	private static FileDialog.FileModeEnum MapFileMode(DisplayServer.FileDialogMode mode) => mode switch
+	{
+		DisplayServer.FileDialogMode.OpenFile => FileDialog.FileModeEnum.OpenFile,
+		DisplayServer.FileDialogMode.OpenFiles => FileDialog.FileModeEnum.OpenFiles,
+		DisplayServer.FileDialogMode.OpenDir => FileDialog.FileModeEnum.OpenDir,
+		DisplayServer.FileDialogMode.SaveFile => FileDialog.FileModeEnum.SaveFile,
+		_ => FileDialog.FileModeEnum.OpenFile,
+	};
 
 	public static void ToggleFullscreen()
 	{
-		CreatorSettings.Singleton.SetSetting("Interface.UseFullscreen", !CreatorSettings.Singleton.GetSetting<bool>("Interface.UseFullscreen"));
+		var settings = CreatorSettingsService.Instance;
+		settings.Set(SharedSettingKeys.Display.Fullscreen, !settings.Get<bool>(SharedSettingKeys.Display.Fullscreen));
 	}
 
 	public void StartFollowCursorLabel(string text)
@@ -655,4 +706,3 @@ public struct FileSelectPromptPayload()
 	public DisplayServer.FileDialogMode DialogMode;
 	public string[] Filters = [];
 }
-
